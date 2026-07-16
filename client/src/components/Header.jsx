@@ -115,22 +115,24 @@ export default function Header({ toggleSidebar }) {
         </div>
 
         {/* ── Main branding + search row ── */}
-        <div className="w-full px-4 md:px-8 py-3 flex items-center gap-4">
+        <div className="w-full px-4 md:px-8 py-3 flex flex-wrap md:flex-nowrap items-center gap-4 justify-between">
           {/* Hamburger — always visible, opens sidebar */}
-          <button
-            onClick={toggleSidebar}
-            aria-label="Toggle menu"
-            className="flex flex-col justify-center gap-[5px] w-10 h-10 bg-primary-container border border-outline-variant/30 rounded-xl cursor-pointer p-2 flex-shrink-0"
-          >
-            <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
-            <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
-            <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSidebar}
+              aria-label="Toggle menu"
+              className="flex flex-col justify-center gap-[5px] w-10 h-10 bg-primary-container border border-outline-variant/30 rounded-xl cursor-pointer p-2 flex-shrink-0"
+            >
+              <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
+              <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
+              <span className="block w-full h-[3px] bg-on-primary-container rounded-sm"></span>
+            </button>
 
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0 no-underline">
-            <img src="/logo.png" alt="We Deliver Mussoorie" className="h-14 w-auto max-w-[200px] object-contain" />
-          </Link>
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2 flex-shrink-0 no-underline">
+              <img src="/logo.png" alt="We Deliver Mussoorie" className="h-10 md:h-14 w-auto max-w-[150px] md:max-w-[200px] object-contain" />
+            </Link>
+          </div>
 
           {/* All Categories button (desktop) */}
           <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container rounded-xl font-semibold text-[13px] hover:brightness-95 transition-all shadow-sm border-none cursor-pointer flex-shrink-0">
@@ -139,7 +141,7 @@ export default function Header({ toggleSidebar }) {
           </button>
 
           {/* Search bar — grows to fill space */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 w-full order-last md:order-none min-w-[200px] mt-2 md:mt-0">
             <input
               type="text"
               className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary transition-all outline-none text-[14px]"

@@ -302,12 +302,38 @@ const clientDistPath = path.join(__dirname, "../../client/dist");
 app.use(express.static(clientDistPath));
 
 // SPA fallback: send index.html for any non-API routes
-app.get("*", (req, res) => {
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
 connectMongo()
-  .then(() => {
+  .then(async () => {
+    try {
+      const User = require("./models/User");
+      const adminEmail = "wedelivermussoorie@gmail.com";
+      let admin = await User.findOne({ email: adminEmail });
+      if (!admin) {
+        admin = new User({
+          name: "Admin",
+          email: adminEmail,
+          password: "WDM@13wedeliver",
+          isAdmin: true,
+          isVerified: true
+        });
+        await admin.save();
+        console.log("Hardcoded Admin account created successfully.");
+      } else if (!admin.isAdmin) {
+        admin.isAdmin = true;
+        await admin.save();
+        console.log("Updated existing account to Admin.");
+      }
+    } catch (error) {
+      console.error("Error creating admin user:", error);
+    }
+
     app.listen(PORT, () => {
       console.log(`API running on http://localhost:${PORT}`);
     });
