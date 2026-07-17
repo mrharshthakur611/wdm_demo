@@ -29,7 +29,9 @@ function ProductModal({ product, onClose, onSave }) {
     formData.append('image', file)
 
     try {
-      const res = await fetch('/api/admin/upload', {
+      // Upload directly to backend to avoid Vercel's edge proxy mangling multipart/form-data
+      const uploadUrl = `${import.meta.env.VITE_API_URL || 'https://wdm-demo.onrender.com'}/api/admin/upload`
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -48,6 +50,13 @@ function ProductModal({ product, onClose, onSave }) {
     e.preventDefault()
     setSaving(true)
     setError(null)
+
+    // Require at least one image source (uploaded file OR URL)
+    if (!form.imageUrl || !form.imageUrl.trim()) {
+      setError('Please upload an image or provide an image URL.')
+      setSaving(false)
+      return
+    }
 
     const payload = {
       ...form,
@@ -125,13 +134,26 @@ function ProductModal({ product, onClose, onSave }) {
               </div>
               
               <div className="space-y-1.5 md:col-span-2 mt-4 pt-4 border-t border-outline-variant/30">
-                <label className="block text-label-sm font-semibold text-on-surface-variant pl-1">Upload Image (Cloudinary) *</label>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-[14px] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[14px] file:font-semibold file:bg-primary-container file:text-on-primary-container hover:file:bg-primary/20 transition-colors" />
-                {uploadingImage && <div className="text-[13px] text-on-surface-variant mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[16px] animate-spin">refresh</span> Uploading to Cloudinary...</div>}
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="block text-label-sm font-semibold text-on-surface-variant pl-1">Or Image URL</label>
-                <input className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-[15px] text-on-background" name="imageUrl" value={form.imageUrl} onChange={handleChange} required placeholder="https://res.cloudinary.com/..." />
+                <label className="block text-label-sm font-semibold text-on-surface-variant pl-1">
+                  Image <span className="text-error">*</span>
+                  <span className="text-on-surface-variant font-normal ml-1">(upload a file OR paste a URL — one is required)</span>
+                </label>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="text-[12px] text-on-surface-variant mb-1.5 pl-1 font-semibold uppercase tracking-wide">Option 1 — Upload to Cloudinary</p>
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full text-[14px] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[14px] file:font-semibold file:bg-primary-container file:text-on-primary-container hover:file:bg-primary/20 transition-colors" />
+                    {uploadingImage && <div className="text-[13px] text-on-surface-variant mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[16px] animate-spin">refresh</span> Uploading to Cloudinary...</div>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-outline-variant/40"></div>
+                    <span className="text-[12px] font-bold text-on-surface-variant uppercase tracking-widest">OR</span>
+                    <div className="flex-1 h-px bg-outline-variant/40"></div>
+                  </div>
+                  <div>
+                    <p className="text-[12px] text-on-surface-variant mb-1.5 pl-1 font-semibold uppercase tracking-wide">Option 2 — Paste Image URL</p>
+                    <input className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-[15px] text-on-background" name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="https://res.cloudinary.com/..." />
+                  </div>
+                </div>
               </div>
               {form.imageUrl && (
                 <div className="md:col-span-2 flex justify-center mt-4">
