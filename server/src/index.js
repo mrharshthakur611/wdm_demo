@@ -25,18 +25,29 @@ app.use(
 );
 
 // CORS configuration (explicit origin required in production)
-const allowedOrigins = process.env.CLIENT_URL ? [process.env.CLIENT_URL] : [];
+// CLIENT_URL can be a single URL or comma-separated list of allowed origins
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map((u) => u.trim()).filter(Boolean)
+  : [];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        // Return a JSON-friendly error so the client never receives unparseable HTML
+        callback(new Error(`CORS: Origin '${origin}' is not allowed`));
       }
     },
   })
 );
+// Ensure CORS errors are returned as JSON, not HTML
+app.use((err, req, res, next) => {
+  if (err && err.message && err.message.startsWith("CORS:")) {
+    return res.status(403).json({ message: err.message });
+  }
+  next(err);
+});
 app.use(express.json());
 
 const razorpayInstance = new Razorpay({
