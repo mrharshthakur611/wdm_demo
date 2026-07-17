@@ -37,9 +37,9 @@ function QuickCategories() {
 // ── Hero Bento Grid ────────────────────────────────────────────────────────
 function HeroBento() {
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <section>
       {/* Main hero card */}
-      <div className="lg:col-span-2 relative h-[300px] md:h-[450px] rounded-xl overflow-hidden shadow-md group">
+      <div className="relative h-[300px] md:h-[450px] rounded-xl overflow-hidden shadow-md group w-full">
         <div className="absolute inset-0 bg-[#FFF9E5]"></div>
         <div className="absolute inset-0 flex items-center px-lg md:px-xl z-10">
           <div className="max-w-md space-y-md">
@@ -58,56 +58,11 @@ function HeroBento() {
           alt="Grocery bag overflowing with fresh vegetables and snacks"
         />
       </div>
-
-      {/* Side card */}
-      <div className="bg-[#00D094] rounded-xl relative h-[300px] md:h-[450px] p-lg flex flex-col justify-between overflow-hidden shadow-md">
-        <div className="z-10 space-y-xs">
-          <h3 className="text-white font-display-lg leading-none m-0">24×7 SUPPORT</h3>
-          <p className="text-white/90 font-label-md m-0">From We Deliver Mussoorie Team</p>
-        </div>
-        <div className="relative z-10">
-          <a href="tel:7420097008" className="inline-block bg-error text-white px-md py-xs rounded-lg font-label-md hover:opacity-90 transition-colors no-underline">
-            CALL NOW
-          </a>
-        </div>
-        <img
-          className="absolute right-0 bottom-0 w-full h-2/3 object-contain object-right-bottom"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-AG14XXSbiJ6FoTaIUfQhzvAvQdbRowBOKYSG3Cn2TWwmdJD9aoO0n2ZgW9WumriSK9jLfN2ki0MuYj5sDBQh6dPbzGbxHHk9z0ZtLBitvoYrCbB8f5kVMVStdiMivCUHpRvmo3yDKvIHEbKNN4ah0uRVPI1qgo5ZZAcKw1Kde6J-suqUqfoI7XQB08qe2L_g-ebbiO1Wv19tkghvFibbLYVfE9GtktFvPuQsLGAqOU_vGX5ZOwkvotdyegkuzxCSQsjV6HOSEu8"
-          alt="Delivery executive on scooter"
-        />
-      </div>
     </section>
   )
 }
 
-// ── Trust Features Bar ─────────────────────────────────────────────────────
-function TrustBar() {
-  return (
-    <section className="bg-surface-container-lowest py-8 px-6 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6 border border-outline-variant/20">
-      <div className="flex items-center gap-md justify-center border-b md:border-b-0 md:border-r border-outline-variant/20 pb-md md:pb-0">
-        <span className="material-symbols-outlined text-primary text-headline-lg" style={{ fontVariationSettings: "'FILL' 1" }}>eco</span>
-        <div className="text-center md:text-left">
-          <h4 className="font-semibold text-body-md m-0">Fresh Products</h4>
-          <p className="text-label-sm text-on-surface-variant m-0">Guaranteed quality every day</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-md justify-center border-b md:border-b-0 md:border-r border-outline-variant/20 pb-md md:pb-0">
-        <span className="material-symbols-outlined text-primary text-headline-lg" style={{ fontVariationSettings: "'FILL' 1" }}>credit_card</span>
-        <div className="text-center md:text-left">
-          <h4 className="font-semibold text-body-md m-0">Safe Payment</h4>
-          <p className="text-label-sm text-on-surface-variant m-0">With any major bank card</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-md justify-center">
-        <span className="material-symbols-outlined text-primary text-headline-lg" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
-        <div className="text-center md:text-left">
-          <h4 className="font-semibold text-body-md m-0">24/7 Support</h4>
-          <p className="text-label-sm text-on-surface-variant m-0">Always here to help you</p>
-        </div>
-      </div>
-    </section>
-  )
-}
+
 
 
 // ── Products Section ───────────────────────────────────────────────────────
@@ -135,21 +90,29 @@ function ProductsSection({ title, actionLabel, actionPath, products }) {
 
 // ── Home Page ──────────────────────────────────────────────────────────────
 function Home() {
-  const [recentlyViewed, setRecentlyViewed] = useState([])
-  const [weeklyDiscounts, setWeeklyDiscounts] = useState([])
+  const [groceries, setGroceries] = useState([])
+  const [food, setFood] = useState([])
+  const [essentials, setEssentials] = useState([])
+  const [bakery, setBakery] = useState([])
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/products?section=recently-viewed').then((r) => r.json()),
-      fetch('/api/products?section=weekly-discounts').then((r) => r.json()),
+      fetch('/api/products?category=grocery').then((r) => r.json()),
+      fetch('/api/products?category=food').then((r) => r.json()),
+      fetch('/api/products?category=essentials').then((r) => r.json()),
+      fetch('/api/products?category=bakery').then((r) => r.json()),
     ])
-      .then(([recent, weekly]) => {
-        setRecentlyViewed(Array.isArray(recent) ? recent : [])
-        setWeeklyDiscounts(Array.isArray(weekly) ? weekly : [])
+      .then(([groceryData, foodData, essentialsData, bakeryData]) => {
+        setGroceries(Array.isArray(groceryData) ? groceryData : [])
+        setFood(Array.isArray(foodData) ? foodData : [])
+        setEssentials(Array.isArray(essentialsData) ? essentialsData : [])
+        setBakery(Array.isArray(bakeryData) ? bakeryData : [])
       })
       .catch(() => {
-        setRecentlyViewed([])
-        setWeeklyDiscounts([])
+        setGroceries([])
+        setFood([])
+        setEssentials([])
+        setBakery([])
       })
   }, [])
 
@@ -157,23 +120,40 @@ function Home() {
     <main className="w-full px-4 md:px-8 py-8 space-y-12">
       <QuickCategories />
       <HeroBento />
-      <TrustBar />
 
-      {recentlyViewed.length > 0 && (
+      {groceries.length > 0 && (
         <ProductsSection
-          title="Recently Viewed"
+          title="Groceries"
           actionLabel="View All"
           actionPath="/grocery"
-          products={recentlyViewed.slice(0, 5)}
+          products={groceries.slice(0, 5)}
         />
       )}
 
-      {weeklyDiscounts.length > 0 && (
+      {food.length > 0 && (
         <ProductsSection
-          title="Weekly Discounts"
-          actionLabel="All Products"
-          actionPath="/grocery"
-          products={weeklyDiscounts.slice(0, 5)}
+          title="Food"
+          actionLabel="View All"
+          actionPath="/food"
+          products={food.slice(0, 5)}
+        />
+      )}
+
+      {essentials.length > 0 && (
+        <ProductsSection
+          title="Essentials"
+          actionLabel="View All"
+          actionPath="/essentials"
+          products={essentials.slice(0, 5)}
+        />
+      )}
+
+      {bakery.length > 0 && (
+        <ProductsSection
+          title="Bakery"
+          actionLabel="View All"
+          actionPath="/bakery"
+          products={bakery.slice(0, 5)}
         />
       )}
     </main>

@@ -135,7 +135,7 @@ export default function Header({ toggleSidebar }) {
           </div>
 
           {/* All Categories button (desktop) */}
-          <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container rounded-xl font-semibold text-[13px] hover:brightness-95 transition-all shadow-sm border-none cursor-pointer flex-shrink-0">
+          <button onClick={() => navigate('/')} className="hidden lg:flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container rounded-xl font-semibold text-[13px] hover:brightness-95 transition-all shadow-sm border-none cursor-pointer flex-shrink-0">
             <span className="material-symbols-outlined text-[18px]">grid_view</span>
             All Categories
           </button>
