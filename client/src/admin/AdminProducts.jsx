@@ -29,9 +29,7 @@ function ProductModal({ product, onClose, onSave }) {
     formData.append('image', file)
 
     try {
-      // Upload directly to backend to avoid Vercel's edge proxy mangling multipart/form-data
-      const uploadUrl = `${import.meta.env.VITE_API_URL || 'https://wdm-demo.onrender.com'}/api/admin/upload`
-      const res = await fetch(uploadUrl, {
+      const res = await fetch('/api/admin/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData

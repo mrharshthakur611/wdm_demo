@@ -320,6 +320,17 @@ app.use((req, res, next) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 
+// Global JSON error handler — catches any unhandled Express errors (multer, cloudinary, etc.)
+// and returns JSON so the frontend never receives an HTML error page.
+// IMPORTANT: must be the last app.use() before connectMongo()
+app.use((err, req, res, next) => {
+  console.error("[Global Error Handler]", err.message || err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    message: err.message || "An unexpected error occurred",
+  });
+});
+
 connectMongo()
   .then(async () => {
     try {

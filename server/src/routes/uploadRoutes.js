@@ -24,16 +24,22 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage: storage });
 
 // POST /api/admin/upload
-router.post("/upload", protect, adminOnly, upload.single("image"), (req, res) => {
-  try {
+router.post("/upload", protect, adminOnly, (req, res) => {
+  // Run multer manually so we can catch its errors and return JSON
+  upload.single("image")(req, res, (err) => {
+    if (err) {
+      // multer or cloudinary threw — return JSON so frontend can display the message
+      console.error("[Upload Error]", err);
+      return res.status(500).json({
+        message: err.message || "Image upload failed",
+      });
+    }
     if (!req.file) {
       return res.status(400).json({ message: "No image provided" });
     }
     // req.file.path contains the public Cloudinary URL
     res.json({ imageUrl: req.file.path });
-  } catch (error) {
-    res.status(500).json({ message: "Image upload failed", error: error.message });
-  }
+  });
 });
 
 module.exports = router;
