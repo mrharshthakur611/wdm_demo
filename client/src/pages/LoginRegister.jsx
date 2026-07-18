@@ -17,6 +17,28 @@ function LoginRegister() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [warmingUp, setWarmingUp] = useState(false)
+
+  // Ping /api/health repeatedly until the server wakes up (Render free-tier cold starts take 50–90s)
+  async function waitForServer() {
+    const maxWait = 100000 // 100 seconds
+    const interval = 3000  // retry every 3 seconds
+    const start = Date.now()
+
+    while (Date.now() - start < maxWait) {
+      try {
+        const ctrl = new AbortController()
+        const t = setTimeout(() => ctrl.abort(), 5000)
+        const res = await fetch('/api/health', { signal: ctrl.signal })
+        clearTimeout(t)
+        if (res.ok) return true
+      } catch {
+        // not ready yet — keep waiting
+      }
+      await new Promise(r => setTimeout(r, interval))
+    }
+    return false
+  }
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -26,16 +48,36 @@ function LoginRegister() {
     e.preventDefault()
     setError(null)
     setSuccess(null)
+    setWarmingUp(false)
     setLoading(true)
 
+    // Step 1: Quick health check — if it fails, the server is cold-starting
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 5000)
+      const healthRes = await fetch('/api/health', { signal: ctrl.signal })
+      clearTimeout(t)
+      if (!healthRes.ok) throw new Error('unhealthy')
+    } catch {
+      // Server is starting up — show a friendly waiting message
+      setWarmingUp(true)
+      const serverUp = await waitForServer()
+      setWarmingUp(false)
+      if (!serverUp) {
+        setError('Server is unavailable right now. Please try again in a minute.')
+        setLoading(false)
+        return
+      }
+    }
+
+    // Step 2: Actual API call (90s timeout to survive any Render delays)
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
-    const body = isLogin 
+    const body = isLogin
       ? { email: formData.email, password: formData.password }
       : formData
 
-    // 15-second timeout to avoid hanging forever
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
+    const timer = setTimeout(() => controller.abort(), 90000)
 
     try {
       const response = await fetch(endpoint, {
@@ -58,11 +100,9 @@ function LoginRegister() {
       }
 
       if (isLogin) {
-        // Login success → go to home
         login(data.user, data.token)
         navigate('/')
       } else {
-        // Register success → show banner and switch to Login tab
         setSuccess('Registered successfully! Please log in with your credentials.')
         setFormData({ name: '', email: formData.email, phone: '', password: '' })
         setIsLogin(true)
@@ -70,7 +110,7 @@ function LoginRegister() {
     } catch (err) {
       clearTimeout(timer)
       if (err.name === 'AbortError') {
-        setError('Request timed out. The server is taking too long — please try again.')
+        setError('Request timed out. Please try again.')
       } else if (
         err.message.includes('string did not match') ||
         err.message.includes('Failed to fetch') ||
@@ -116,6 +156,15 @@ function LoginRegister() {
             </button>
           </div>
 
+          {/* Server warm-up banner */}
+          {warmingUp && (
+            <div className="bg-[#fff3cd] text-[#856404] px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 border border-[#ffc107]">
+              <span className="material-symbols-outlined text-[18px] animate-spin">refresh</span>
+              Server is waking up, please wait… (this takes ~30–60 seconds on first use)
+            </div>
+          )}
+
+          {/* Success banner */}
           {success && (
             <div className="bg-[#d4edda] text-[#155724] px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 border border-[#c3e6cb]">
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
@@ -123,6 +172,7 @@ function LoginRegister() {
             </div>
           )}
 
+          {/* Error banner */}
           {error && (
             <div className="bg-error-container text-on-error-container px-4 py-3 rounded-xl text-[14px] flex items-center gap-2">
                <span className="material-symbols-outlined text-[18px]">error</span>
@@ -149,7 +199,7 @@ function LoginRegister() {
               <div className="pt-2">
                 <button type="submit" className="w-full py-3.5 bg-primary text-on-primary rounded-xl font-semibold text-[16px] hover:brightness-95 transition-all shadow-md shadow-primary/20 border-none cursor-pointer flex items-center justify-center gap-2" disabled={loading}>
                   {loading ? (
-                    <><span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> Processing...</>
+                    <><span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> {warmingUp ? 'Waking up server…' : 'Processing...'}</>
                   ) : (
                     'Login to Account'
                   )}
@@ -189,7 +239,7 @@ function LoginRegister() {
               <div className="pt-2">
                 <button type="submit" className="w-full py-3.5 bg-primary text-on-primary rounded-xl font-semibold text-[16px] hover:brightness-95 transition-all shadow-md shadow-primary/20 border-none cursor-pointer flex items-center justify-center gap-2" disabled={loading}>
                   {loading ? (
-                    <><span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> Processing...</>
+                    <><span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> {warmingUp ? 'Waking up server…' : 'Processing...'}</>
                   ) : (
                     'Create Account'
                   )}
