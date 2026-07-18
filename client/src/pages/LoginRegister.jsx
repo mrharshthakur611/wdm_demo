@@ -15,6 +15,7 @@ function LoginRegister() {
     password: ''
   })
   const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(null)
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => {
@@ -44,8 +45,16 @@ function LoginRegister() {
         throw new Error(data.message || 'Something went wrong')
       }
 
-      login(data.user, data.token)
-      navigate('/')
+      if (isLogin) {
+        // Login success → go to home
+        login(data.user, data.token)
+        navigate('/')
+      } else {
+        // Register success → show banner and switch to Login tab
+        setSuccess('Registered successfully! Please log in with your credentials.')
+        setFormData({ name: '', email: formData.email, phone: '', password: '' })
+        setIsLogin(true)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -71,17 +80,24 @@ function LoginRegister() {
           <div className="flex bg-surface-container rounded-xl p-1">
             <button 
               className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
-              onClick={() => setIsLogin(true)}
+              onClick={() => { setIsLogin(true); setError(null); setSuccess(null); }}
             >
               Login
             </button>
             <button 
               className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${!isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
-              onClick={() => setIsLogin(false)}
+              onClick={() => { setIsLogin(false); setError(null); setSuccess(null); }}
             >
               Register
             </button>
           </div>
+
+          {success && (
+            <div className="bg-[#d4edda] text-[#155724] px-4 py-3 rounded-xl text-[14px] flex items-center gap-2 border border-[#c3e6cb]">
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              {success}
+            </div>
+          )}
 
           {error && (
             <div className="bg-error-container text-on-error-container px-4 py-3 rounded-xl text-[14px] flex items-center gap-2">
