@@ -75,7 +75,7 @@ function Cart() {
     }
 
     try {
-      const keyRes = await fetch('/api/razorpay/key', {
+      const keyRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/razorpay/key`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -85,7 +85,7 @@ function Cart() {
         throw new Error(keyData.message || 'Failed to load Razorpay key')
       }
 
-      const orderResponse = await fetch('/api/orders/razorpay', {
+      const orderResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/orders/razorpay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ function Cart() {
         order_id: orderData.id,
         handler: async function (response) {
           try {
-            const verifyRes = await fetch('/api/orders/verify', {
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/orders/verify`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

@@ -12,7 +12,7 @@ export default function AdminUsers() {
   const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
-    fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => { setUsers(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => { setError('Failed to load users'); setLoading(false) })
@@ -22,7 +22,7 @@ export default function AdminUsers() {
     if (!window.confirm(`Toggle admin status for "${name}"?`)) return
     setTogglingId(userId)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/toggle-admin`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/users/${userId}/toggle-admin`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -40,7 +40,7 @@ export default function AdminUsers() {
     if (!window.confirm(`Permanently delete user "${name}"? This cannot be undone.`)) return
     setDeletingId(userId)
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

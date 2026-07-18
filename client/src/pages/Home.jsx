@@ -97,10 +97,10 @@ function Home() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/products?category=grocery').then((r) => r.json()),
-      fetch('/api/products?category=food').then((r) => r.json()),
-      fetch('/api/products?category=essentials').then((r) => r.json()),
-      fetch('/api/products?category=bakery').then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/products?category=grocery`).then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/products?category=food`).then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/products?category=essentials`).then((r) => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL || ''}/api/products?category=bakery`).then((r) => r.json()),
     ])
       .then(([groceryData, foodData, essentialsData, bakeryData]) => {
         setGroceries(Array.isArray(groceryData) ? groceryData : [])

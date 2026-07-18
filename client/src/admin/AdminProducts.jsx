@@ -29,7 +29,7 @@ function ProductModal({ product, onClose, onSave }) {
     formData.append('image', file)
 
     try {
-      const res = await fetch('/api/admin/upload', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -63,7 +63,7 @@ function ProductModal({ product, onClose, onSave }) {
       mrp: form.mrp ? parseFloat(form.mrp) : null,
     }
 
-    const url = isEdit ? `/api/admin/products/${form.id}` : '/api/admin/products'
+    const url = isEdit ? `${import.meta.env.VITE_API_URL || ''}/api/admin/products/${form.id}` : `${import.meta.env.VITE_API_URL || ''}/api/admin/products`
     const method = isEdit ? 'PUT' : 'POST'
 
     try {
@@ -187,7 +187,7 @@ export default function AdminProducts() {
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/products', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/products`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       setProducts(Array.isArray(data) ? data : [])
     } catch {
@@ -203,7 +203,7 @@ export default function AdminProducts() {
     if (!window.confirm(`Delete product "${productId}"?`)) return
     setDeletingId(productId)
     try {
-      const res = await fetch(`/api/admin/products/${productId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/products/${productId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       })

@@ -99,7 +99,7 @@ export default function AccountAddresses() {
 
     try {
       setSaving(true)
-      const res = await fetch('/api/auth/me/addresses', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me/addresses`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

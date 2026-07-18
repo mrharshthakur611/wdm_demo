@@ -78,7 +78,7 @@ export default function AccountDetails() {
 
     try {
       setSaving(true)
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/me`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

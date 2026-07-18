@@ -68,7 +68,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/admin/stats', {
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/stats`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(r => r.json())

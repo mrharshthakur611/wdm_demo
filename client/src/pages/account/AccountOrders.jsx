@@ -30,7 +30,7 @@ export default function AccountOrders() {
       try {
         setLoading(true)
         setError('')
-        const res = await fetch('/api/orders/my', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/orders/my`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

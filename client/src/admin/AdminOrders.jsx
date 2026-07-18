@@ -60,7 +60,7 @@ function OrderDetailModal({ order, onClose, onStatusUpdate }) {
   const handleStatusSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/orders/${order._id}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/orders/${order._id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status })
@@ -205,7 +205,7 @@ export default function AdminOrders() {
       setError(null)
 
       try {
-        const res = await fetch('/api/admin/orders', { headers: { Authorization: `Bearer ${token}` } })
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/orders`, { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json().catch(() => null)
 
         if (!res.ok) {

@@ -34,7 +34,7 @@ function LoginRegister() {
       try {
         const ctrl = new AbortController()
         const t = setTimeout(() => ctrl.abort(), 5000)
-        const res = await fetch('/api/health', { signal: ctrl.signal })
+        const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/health`, { signal: ctrl.signal })
         clearTimeout(t)
         if (res.ok) return true
       } catch {
@@ -56,7 +56,7 @@ function LoginRegister() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: otpEmail, otp: otpValue })
@@ -85,7 +85,7 @@ function LoginRegister() {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/resend-verification', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: otpEmail })
@@ -116,7 +116,7 @@ function LoginRegister() {
     try {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), 5000)
-      const healthRes = await fetch('/api/health', { signal: ctrl.signal })
+      const healthRes = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/health`, { signal: ctrl.signal })
       clearTimeout(t)
       if (!healthRes.ok) throw new Error('unhealthy')
     } catch {
@@ -132,7 +132,7 @@ function LoginRegister() {
     }
 
     // Step 2: Actual API call (90s timeout to survive any Render delays)
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
+    const endpoint = isLogin ? `${import.meta.env.VITE_API_URL || ''}/api/auth/login` : `${import.meta.env.VITE_API_URL || ''}/api/auth/register`
     const body = isLogin
       ? { email: formData.email, password: formData.password }
       : formData
