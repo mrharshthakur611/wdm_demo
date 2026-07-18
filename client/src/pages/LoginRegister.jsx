@@ -25,6 +25,7 @@ function LoginRegister() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setLoading(true)
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register'
@@ -32,14 +33,25 @@ function LoginRegister() {
       ? { email: formData.email, password: formData.password }
       : formData
 
+    // 15-second timeout to avoid hanging forever
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       })
-      
-      const data = await response.json()
+      clearTimeout(timer)
+
+      let data
+      try {
+        data = await response.json()
+      } catch {
+        throw new Error('Server returned an unexpected response. Please try again.')
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Something went wrong')
@@ -56,7 +68,19 @@ function LoginRegister() {
         setIsLogin(true)
       }
     } catch (err) {
-      setError(err.message)
+      clearTimeout(timer)
+      if (err.name === 'AbortError') {
+        setError('Request timed out. The server is taking too long — please try again.')
+      } else if (
+        err.message.includes('string did not match') ||
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('NetworkError') ||
+        err.message.includes('Load failed')
+      ) {
+        setError('Network error — please check your connection and try again.')
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }

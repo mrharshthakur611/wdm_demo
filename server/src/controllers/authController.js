@@ -107,14 +107,15 @@ async function registerUser(req, res) {
       password,
     });
 
-    // Generate and send verification email
-    const token = await generateVerificationToken(user);
-    try {
-      await sendVerificationEmail(user, token);
-    } catch (emailError) {
-      console.error("Failed to send verification email:", emailError);
-      // Don't fail registration if email fails
-    }
+    // Generate verification token and fire email in the background
+    // (don't await — respond to client immediately)
+    generateVerificationToken(user).then((token) => {
+      sendVerificationEmail(user, token).catch((emailError) => {
+        console.error("Failed to send verification email:", emailError);
+      });
+    }).catch((tokenError) => {
+      console.error("Failed to generate verification token:", tokenError);
+    });
 
     sendAuthResponse(res, 201, "User registered successfully. Please check your email to verify your account.", user);
   } catch (error) {
