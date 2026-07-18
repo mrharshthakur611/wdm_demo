@@ -25,32 +25,31 @@ function sanitizeUser(user) {
   };
 }
 
-async function generateVerificationToken(user) {
-  const token = crypto.randomBytes(32).toString("hex");
-  user.verificationToken = crypto.createHash("sha256").update(token).digest("hex");
-  user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+async function generateVerificationOtp(user) {
+  // Generate a random 6-digit number string
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  user.verificationOtp = otp;
+  user.verificationOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
   await user.save();
-  return token;
+  return otp;
 }
 
-async function sendVerificationEmail(user, token) {
-  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
-
+async function sendVerificationEmail(user, otp) {
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1>Verify Your Email</h1>
-      <p>Hi ${user.name},</p>
-      <p>Thank you for registering! Please click the button below to verify your email address:</p>
-      <a href="${verificationUrl}" style="display: inline-block; padding: 12px 24px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 8px; margin: 16px 0;">Verify Email</a>
-      <p>If the button doesn't work, copy and paste this link into your browser:</p>
-      <p>${verificationUrl}</p>
-      <p>This link will expire in 24 hours.</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+      <h1 style="color: #333; text-align: center;">Verify Your Email</h1>
+      <p style="font-size: 16px; color: #555;">Hi ${user.name},</p>
+      <p style="font-size: 16px; color: #555;">Thank you for registering! Your 6-digit email verification code is:</p>
+      <div style="background-color: #f59e0b; color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; margin: 24px 0; letter-spacing: 4px;">
+        ${otp}
+      </div>
+      <p style="font-size: 14px; color: #777; text-align: center;">This code will expire in 10 minutes.</p>
     </div>
   `;
 
   await sendEmail({
     to: user.email,
-    subject: "Verify Your Email Address",
+    subject: "Your Email Verification Code",
     html,
   });
 }
@@ -107,14 +106,14 @@ async function registerUser(req, res) {
       password,
     });
 
-    // Generate verification token and fire email in the background
+    // Generate verification OTP and fire email in the background
     // (don't await — respond to client immediately)
-    generateVerificationToken(user).then((token) => {
-      sendVerificationEmail(user, token).catch((emailError) => {
+    generateVerificationOtp(user).then((otp) => {
+      sendVerificationEmail(user, otp).catch((emailError) => {
         console.error("Failed to send verification email:", emailError);
       });
-    }).catch((tokenError) => {
-      console.error("Failed to generate verification token:", tokenError);
+    }).catch((otpError) => {
+      console.error("Failed to generate verification OTP:", otpError);
     });
 
     sendAuthResponse(res, 201, "User registered successfully. Please check your email to verify your account.", user);
@@ -143,30 +142,31 @@ async function registerUser(req, res) {
   }
 }
 
-async function verifyEmail(req, res) {
+async function verifyOtp(req, res) {
   try {
-    const { token } = req.query;
+    const { email, otp } = req.body;
 
-    if (!token) {
-      return res.status(400).json({ message: "Verification token is required" });
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
     }
 
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await User.findOne({
-      verificationToken: hashedToken,
-      verificationTokenExpires: { $gt: Date.now() },
+      email: normalizedEmail,
+      verificationOtp: otp,
+      verificationOtpExpires: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired verification token" });
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
     user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = undefined;
+    user.verificationOtp = undefined;
+    user.verificationOtpExpires = undefined;
     await user.save();
 
-    res.json({ message: "Email verified successfully" });
+    res.json({ message: "Email verified successfully", token: generateToken(user._id.toString()), user: sanitizeUser(user) });
   } catch (error) {
     const includeDetails = process.env.NODE_ENV !== "production";
     res.status(500).json({
@@ -195,14 +195,14 @@ async function resendVerificationEmail(req, res) {
       return res.status(400).json({ message: "Email is already verified" });
     }
 
-    const token = await generateVerificationToken(user);
-    await sendVerificationEmail(user, token);
+    const otp = await generateVerificationOtp(user);
+    await sendVerificationEmail(user, otp);
 
-    res.json({ message: "Verification email resent successfully" });
+    res.json({ message: "Verification code resent successfully" });
   } catch (error) {
     const includeDetails = process.env.NODE_ENV !== "production";
     res.status(500).json({
-      message: "Failed to resend verification email",
+      message: "Failed to resend verification code",
       ...(includeDetails ? { details: error.message } : {}),
     });
   }
@@ -235,6 +235,11 @@ async function loginUser(req, res) {
 
     if (!isPasswordValid) {
       res.status(401).json({ message: "Invalid credentials" });
+      return;
+    }
+
+    if (!user.isVerified) {
+      res.status(403).json({ message: "Please verify your email to log in", unverified: true });
       return;
     }
 
@@ -372,6 +377,6 @@ module.exports = {
   getCurrentUser,
   updateCurrentUser,
   updateCurrentUserAddresses,
-  verifyEmail,
+  verifyOtp,
   resendVerificationEmail,
 };

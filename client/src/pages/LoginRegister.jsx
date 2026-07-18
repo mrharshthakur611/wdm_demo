@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-
 function LoginRegister() {
   const [isLogin, setIsLogin] = useState(true)
   const { login } = useAuth()
@@ -14,12 +13,18 @@ function LoginRegister() {
     phone: '',
     password: ''
   })
+  
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [loading, setLoading] = useState(false)
   const [warmingUp, setWarmingUp] = useState(false)
 
-  // Ping /api/health repeatedly until the server wakes up (Render free-tier cold starts take 50–90s)
+  // OTP Verification States
+  const [showOtp, setShowOtp] = useState(false)
+  const [otpEmail, setOtpEmail] = useState('')
+  const [otpValue, setOtpValue] = useState('')
+
+  // Ping /api/health repeatedly until the server wakes up
   async function waitForServer() {
     const maxWait = 100000 // 100 seconds
     const interval = 3000  // retry every 3 seconds
@@ -42,6 +47,62 @@ function LoginRegister() {
 
   const handleChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail, otp: otpValue })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Verification failed')
+      }
+
+      setSuccess('Email verified successfully! You can now log in.')
+      setShowOtp(false)
+      setIsLogin(true)
+      setOtpValue('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    setError(null)
+    setSuccess(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to resend OTP')
+      }
+
+      setSuccess('A new verification code has been sent to your email.')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -96,6 +157,12 @@ function LoginRegister() {
       }
 
       if (!response.ok) {
+        // If unverified, switch to OTP view
+        if (data.unverified) {
+          setOtpEmail(formData.email)
+          setShowOtp(true)
+          throw new Error(data.message)
+        }
         throw new Error(data.message || 'Something went wrong')
       }
 
@@ -103,9 +170,11 @@ function LoginRegister() {
         login(data.user, data.token)
         navigate('/')
       } else {
-        setSuccess('Registered successfully! Please log in with your credentials.')
+        // On successful registration, prompt for OTP
+        setOtpEmail(formData.email)
+        setShowOtp(true)
+        setSuccess('Registered successfully! Please check your email for the verification code.')
         setFormData({ name: '', email: formData.email, phone: '', password: '' })
-        setIsLogin(true)
       }
     } catch (err) {
       clearTimeout(timer)
@@ -140,21 +209,22 @@ function LoginRegister() {
         </div>
 
         <div className="p-6 md:p-8 space-y-6">
-          {/* Tabs */}
-          <div className="flex bg-surface-container rounded-xl p-1">
-            <button 
-              className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
-              onClick={() => { setIsLogin(true); setError(null); setSuccess(null); }}
-            >
-              Login
-            </button>
-            <button 
-              className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${!isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
-              onClick={() => { setIsLogin(false); setError(null); setSuccess(null); }}
-            >
-              Register
-            </button>
-          </div>
+          {!showOtp && (
+            <div className="flex bg-surface-container rounded-xl p-1">
+              <button 
+                className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
+                onClick={() => { setIsLogin(true); setError(null); setSuccess(null); }}
+              >
+                Login
+              </button>
+              <button 
+                className={`flex-1 py-2.5 rounded-lg text-label-md font-semibold transition-all border-none cursor-pointer ${!isLogin ? 'bg-surface-container-lowest shadow-sm text-on-background' : 'bg-transparent text-on-surface-variant hover:text-on-background'}`} 
+                onClick={() => { setIsLogin(false); setError(null); setSuccess(null); }}
+              >
+                Register
+              </button>
+            </div>
+          )}
 
           {/* Server warm-up banner */}
           {warmingUp && (
@@ -180,7 +250,32 @@ function LoginRegister() {
             </div>
           )}
 
-          {isLogin ? (
+          {showOtp ? (
+            <form className="space-y-4" onSubmit={handleOtpSubmit}>
+              <div className="space-y-1.5">
+                <label className="block text-label-sm font-semibold text-on-background pl-1">Verification Code</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">password</span>
+                  <input type="text" name="otp" value={otpValue} onChange={(e) => setOtpValue(e.target.value)} required className="w-full pl-10 pr-4 py-3 bg-surface-container-low border border-outline-variant/40 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-[15px]" placeholder="Enter 6-digit OTP" />
+                </div>
+              </div>
+              <div className="pt-2 flex flex-col gap-3">
+                <button type="submit" className="w-full py-3.5 bg-primary text-on-primary rounded-xl font-semibold text-[16px] hover:brightness-95 transition-all shadow-md shadow-primary/20 border-none cursor-pointer flex items-center justify-center gap-2" disabled={loading}>
+                  {loading ? (
+                    <><span className="material-symbols-outlined animate-spin text-[20px]">refresh</span> Processing...</>
+                  ) : (
+                    'Verify Email'
+                  )}
+                </button>
+                <button type="button" onClick={handleResendOtp} disabled={loading} className="w-full py-3.5 bg-surface-container text-on-surface rounded-xl font-semibold text-[16px] hover:bg-surface-container-high transition-all border-none cursor-pointer flex items-center justify-center gap-2">
+                  Resend Code
+                </button>
+                <button type="button" onClick={() => { setShowOtp(false); setError(null); setSuccess(null); }} className="w-full text-primary font-semibold text-[14px] cursor-pointer bg-transparent border-none hover:underline">
+                  Back to Login
+                </button>
+              </div>
+            </form>
+          ) : isLogin ? (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-1.5">
                 <label className="block text-label-sm font-semibold text-on-background pl-1">Email Address</label>
