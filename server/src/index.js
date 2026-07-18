@@ -3,6 +3,11 @@ const helmet = require("helmet");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const dns = require("dns");
+
+// Force IPv4 resolution globally to fix Render IPv6 ENETUNREACH errors (e.g. for Gmail SMTP)
+dns.setDefaultResultOrder("ipv4first");
+
 dotenv.config();
 const apiLimiter = require("./middleware/ratelimiter.js");
 const { connectMongo } = require("./config/db");
