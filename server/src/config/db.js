@@ -4,9 +4,10 @@ async function connectMongo() {
   const mongoUri = process.env.MONGO_URI;
 
   if (!mongoUri) {
-    console.warn("MONGO_URI is not set. Running without MongoDB connection.");
-    return;
+    throw new Error("MONGO_URI environment variable is not set!");
   }
+
+  mongoose.set("bufferCommands", false); // Don't hang requests if disconnected
 
   await mongoose.connect(mongoUri, {
     dbName: process.env.MONGO_DB_NAME || "wdm",
