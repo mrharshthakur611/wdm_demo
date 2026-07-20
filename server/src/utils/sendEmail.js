@@ -1,18 +1,22 @@
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === "true", // false for port 587 (STARTTLS)
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 async function sendEmail({ to, subject, html }) {
-  const { error } = await resend.emails.send({
-    from: "We Deliver Mussoorie <onboarding@resend.dev>",
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to,
     subject,
     html,
   });
-
-  if (error) {
-    throw new Error(`Resend error: ${error.message}`);
-  }
 }
 
 module.exports = sendEmail;
