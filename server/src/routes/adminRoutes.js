@@ -154,6 +154,15 @@ router.patch("/orders/:id/status", async (req, res) => {
       { new: true }
     ).populate("user", "name email phone");
     if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Send Delivery Email if status is changed to Delivered
+    if (status === "Delivered" && order.user) {
+      const { sendDeliveryEmail } = require("../utils/emailTemplates");
+      sendDeliveryEmail(order.user, order).catch((err) => {
+        console.error("Failed to send delivery email:", err);
+      });
+    }
+
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: "Server Error" });

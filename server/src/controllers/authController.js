@@ -1,7 +1,10 @@
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const sendEmail = require("../utils/sendEmail");
-const crypto = require("crypto");
+
+// ─── In-memory OTP store (email → { name, email, phone, password, otp, expiresAt }) ───
+// User data is NOT saved to DB until OTP is verified.
+const pendingRegistrations = new Map();
 
 function isValidEmail(email) {
   return /^\S+@\S+\.\S+$/.test(email);
@@ -25,31 +28,26 @@ function sanitizeUser(user) {
   };
 }
 
-async function generateVerificationOtp(user) {
-  // Generate a random 6-digit number string
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  user.verificationOtp = otp;
-  user.verificationOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-  await user.save();
-  return otp;
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-async function sendVerificationEmail(user, otp) {
+async function sendVerificationEmail(name, email, otp) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
       <h1 style="color: #333; text-align: center;">Verify Your Email</h1>
-      <p style="font-size: 16px; color: #555;">Hi ${user.name},</p>
-      <p style="font-size: 16px; color: #555;">Thank you for registering! Your 6-digit email verification code is:</p>
+      <p style="font-size: 16px; color: #555;">Hi ${name},</p>
+      <p style="font-size: 16px; color: #555;">Thank you for registering with <strong>We Deliver Mussoorie</strong>! Your 6-digit email verification code is:</p>
       <div style="background-color: #f59e0b; color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; margin: 24px 0; letter-spacing: 4px;">
         ${otp}
       </div>
-      <p style="font-size: 14px; color: #777; text-align: center;">This code will expire in 10 minutes.</p>
+      <p style="font-size: 14px; color: #777; text-align: center;">This code will expire in 10 minutes. Do not share it with anyone.</p>
     </div>
   `;
 
   await sendEmail({
-    to: user.email,
-    subject: "Your Email Verification Code",
+    to: email,
+    subject: "Your Email Verification Code – We Deliver Mussoorie",
     html,
   });
 }
@@ -62,13 +60,15 @@ function sendAuthResponse(res, statusCode, message, user) {
   });
 }
 
+// ─── REGISTER ───────────────────────────────────────────────
+// Validates input, stores data in-memory, sends OTP.
+// Does NOT save user to DB yet.
 async function registerUser(req, res) {
   try {
     const { name, email, phone, password } = req.body;
 
     if (!name || !email || !password) {
-      res.status(400).json({ message: "Name, email, and password are required" });
-      return;
+      return res.status(400).json({ message: "Name, email, and password are required" });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -76,62 +76,51 @@ async function registerUser(req, res) {
     const trimmedPhone = phone ? phone.trim() : "";
 
     if (trimmedName.length < 2) {
-      res.status(400).json({ message: "Name must be at least 2 characters long" });
-      return;
+      return res.status(400).json({ message: "Name must be at least 2 characters long" });
     }
 
     if (!isValidEmail(normalizedEmail)) {
-      res.status(400).json({ message: "Please provide a valid email address" });
-      return;
+      return res.status(400).json({ message: "Please provide a valid email address" });
     }
 
     if (!validatePassword(password)) {
-      res
-        .status(400)
-        .json({ message: "Password must be at least 8 characters long" });
-      return;
+      return res.status(400).json({ message: "Password must be at least 8 characters long" });
     }
 
+    // Check if email already exists in DB (fully registered users)
     const existingUser = await User.findOne({ email: normalizedEmail });
-
     if (existingUser) {
-      res.status(409).json({ message: "User already exists" });
-      return;
+      return res.status(409).json({ message: "User already exists" });
     }
 
-    const user = await User.create({
+    // Generate OTP and store pending registration in memory
+    const otp = generateOtp();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    pendingRegistrations.set(normalizedEmail, {
       name: trimmedName,
       email: normalizedEmail,
       phone: trimmedPhone,
-      password,
+      password, // plain-text; will be hashed by User model pre-save hook on DB save
+      otp,
+      expiresAt,
     });
 
-    // Generate verification OTP and fire email in the background
-    // (don't await — respond to client immediately)
-    generateVerificationOtp(user).then((otp) => {
-      sendVerificationEmail(user, otp).catch((emailError) => {
-        console.error("Failed to send verification email:", emailError);
-      });
-    }).catch((otpError) => {
-      console.error("Failed to generate verification OTP:", otpError);
-    });
+    // Send OTP email
+    try {
+      await sendVerificationEmail(trimmedName, normalizedEmail, otp);
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+      pendingRegistrations.delete(normalizedEmail);
+      return res.status(500).json({ message: "Failed to send verification email. Please try again." });
+    }
 
-    sendAuthResponse(res, 201, "User registered successfully. Please check your email to verify your account.", user);
+    res.status(200).json({
+      message: "Verification code sent to your email. Please enter the OTP to complete registration.",
+    });
   } catch (error) {
-    if (error.code === 11000) {
-      res.status(409).json({ message: "User already exists" });
-      return;
-    }
-
-    if (error.name === "ValidationError") {
-      const firstMessage = Object.values(error.errors || {})[0]?.message;
-      res.status(400).json({ message: firstMessage || "Invalid input" });
-      return;
-    }
-
     if (error.name === "MongoServerError" && error.codeName === "Unauthorized") {
-      res.status(500).json({ message: "Database authorization failed" });
-      return;
+      return res.status(500).json({ message: "Database authorization failed" });
     }
 
     const includeDetails = process.env.NODE_ENV !== "production";
@@ -142,6 +131,8 @@ async function registerUser(req, res) {
   }
 }
 
+// ─── VERIFY OTP ─────────────────────────────────────────────
+// Validates OTP against in-memory store, THEN saves user to DB.
 async function verifyOtp(req, res) {
   try {
     const { email, otp } = req.body;
@@ -151,9 +142,41 @@ async function verifyOtp(req, res) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    // --- Check pending registration first (new unverified signups) ---
+    const pending = pendingRegistrations.get(normalizedEmail);
+    if (pending) {
+      if (Date.now() > pending.expiresAt) {
+        pendingRegistrations.delete(normalizedEmail);
+        return res.status(400).json({ message: "OTP has expired. Please register again." });
+      }
+
+      if (pending.otp !== otp.trim()) {
+        return res.status(400).json({ message: "Invalid OTP. Please try again." });
+      }
+
+      // OTP is correct — create the user in DB now
+      const user = await User.create({
+        name: pending.name,
+        email: pending.email,
+        phone: pending.phone,
+        password: pending.password,
+        isVerified: true,
+      });
+
+      pendingRegistrations.delete(normalizedEmail);
+
+      return res.status(201).json({
+        message: "Email verified successfully! Your account has been created.",
+        token: generateToken(user._id.toString()),
+        user: sanitizeUser(user),
+      });
+    }
+
+    // --- Fallback: handle legacy users already in DB but not yet verified ---
     const user = await User.findOne({
       email: normalizedEmail,
-      verificationOtp: otp,
+      verificationOtp: otp.trim(),
       verificationOtpExpires: { $gt: Date.now() },
     });
 
@@ -166,7 +189,11 @@ async function verifyOtp(req, res) {
     user.verificationOtpExpires = undefined;
     await user.save();
 
-    res.json({ message: "Email verified successfully", token: generateToken(user._id.toString()), user: sanitizeUser(user) });
+    return res.json({
+      message: "Email verified successfully",
+      token: generateToken(user._id.toString()),
+      user: sanitizeUser(user),
+    });
   } catch (error) {
     const includeDetails = process.env.NODE_ENV !== "production";
     res.status(500).json({
@@ -176,6 +203,7 @@ async function verifyOtp(req, res) {
   }
 }
 
+// ─── RESEND OTP ─────────────────────────────────────────────
 async function resendVerificationEmail(req, res) {
   try {
     const { email } = req.body;
@@ -185,20 +213,36 @@ async function resendVerificationEmail(req, res) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
 
+    // Check pending registrations first
+    const pending = pendingRegistrations.get(normalizedEmail);
+    if (pending) {
+      const otp = generateOtp();
+      pending.otp = otp;
+      pending.expiresAt = Date.now() + 10 * 60 * 1000;
+      pendingRegistrations.set(normalizedEmail, pending);
+
+      await sendVerificationEmail(pending.name, normalizedEmail, otp);
+      return res.json({ message: "Verification code resent successfully" });
+    }
+
+    // Fallback: legacy users already in DB
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "No pending registration found for this email" });
     }
 
     if (user.isVerified) {
       return res.status(400).json({ message: "Email is already verified" });
     }
 
-    const otp = await generateVerificationOtp(user);
-    await sendVerificationEmail(user, otp);
+    const otp = generateOtp();
+    user.verificationOtp = otp;
+    user.verificationOtpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
 
-    res.json({ message: "Verification code resent successfully" });
+    await sendVerificationEmail(user.name, normalizedEmail, otp);
+    return res.json({ message: "Verification code resent successfully" });
   } catch (error) {
     const includeDetails = process.env.NODE_ENV !== "production";
     res.status(500).json({
@@ -208,39 +252,35 @@ async function resendVerificationEmail(req, res) {
   }
 }
 
+// ─── LOGIN ──────────────────────────────────────────────────
 async function loginUser(req, res) {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      res.status(400).json({ message: "Email and password are required" });
-      return;
+      return res.status(400).json({ message: "Email and password are required" });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!isValidEmail(normalizedEmail)) {
-      res.status(400).json({ message: "Please provide a valid email address" });
-      return;
+      return res.status(400).json({ message: "Please provide a valid email address" });
     }
 
     const user = await User.findOne({ email: normalizedEmail }).select("+password");
 
     if (!user) {
-      res.status(401).json({ message: "Invalid credentials" });
-      return;
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isPasswordValid = await user.comparePassword(password);
 
     if (!isPasswordValid) {
-      res.status(401).json({ message: "Invalid credentials" });
-      return;
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     if (!user.isVerified) {
-      res.status(403).json({ message: "Please verify your email to log in", unverified: true });
-      return;
+      return res.status(403).json({ message: "Please verify your email to log in", unverified: true });
     }
 
     sendAuthResponse(res, 200, "Login successful", user);
@@ -263,15 +303,13 @@ async function updateCurrentUser(req, res) {
 
     const user = await User.findById(req.user._id).select("+password");
     if (!user) {
-      res.status(404).json({ message: "User not found" });
-      return;
+      return res.status(404).json({ message: "User not found" });
     }
 
     if (typeof name === "string") {
       const trimmedName = name.trim();
       if (trimmedName.length < 2) {
-        res.status(400).json({ message: "Name must be at least 2 characters long" });
-        return;
+        return res.status(400).json({ message: "Name must be at least 2 characters long" });
       }
       user.name = trimmedName;
     }
@@ -279,15 +317,13 @@ async function updateCurrentUser(req, res) {
     if (typeof email === "string") {
       const normalizedEmail = email.trim().toLowerCase();
       if (!isValidEmail(normalizedEmail)) {
-        res.status(400).json({ message: "Please provide a valid email address" });
-        return;
+        return res.status(400).json({ message: "Please provide a valid email address" });
       }
 
       if (normalizedEmail !== user.email) {
         const existingUser = await User.findOne({ email: normalizedEmail });
         if (existingUser) {
-          res.status(409).json({ message: "Email is already in use" });
-          return;
+          return res.status(409).json({ message: "Email is already in use" });
         }
         user.email = normalizedEmail;
       }
@@ -300,19 +336,16 @@ async function updateCurrentUser(req, res) {
     const wantsPasswordChange = Boolean(currentPassword || newPassword);
     if (wantsPasswordChange) {
       if (!currentPassword || !newPassword) {
-        res.status(400).json({ message: "Current password and new password are required" });
-        return;
+        return res.status(400).json({ message: "Current password and new password are required" });
       }
 
       if (!validatePassword(newPassword)) {
-        res.status(400).json({ message: "Password must be at least 8 characters long" });
-        return;
+        return res.status(400).json({ message: "Password must be at least 8 characters long" });
       }
 
       const isPasswordValid = await user.comparePassword(currentPassword);
       if (!isPasswordValid) {
-        res.status(401).json({ message: "Current password is incorrect" });
-        return;
+        return res.status(401).json({ message: "Current password is incorrect" });
       }
 
       user.password = newPassword;
@@ -322,8 +355,7 @@ async function updateCurrentUser(req, res) {
     res.json({ message: "Account updated successfully", user: sanitizeUser(user) });
   } catch (error) {
     if (error.code === 11000) {
-      res.status(409).json({ message: "Email is already in use" });
-      return;
+      return res.status(409).json({ message: "Email is already in use" });
     }
 
     const includeDetails = process.env.NODE_ENV !== "production";
@@ -340,8 +372,7 @@ async function updateCurrentUserAddresses(req, res) {
 
     const user = await User.findById(req.user._id);
     if (!user) {
-      res.status(404).json({ message: "User not found" });
-      return;
+      return res.status(404).json({ message: "User not found" });
     }
 
     if (billing === null) {

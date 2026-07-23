@@ -188,6 +188,12 @@ app.post("/api/orders", protect, async (req, res) => {
       throw saveError;
     }
 
+    // Send Order Confirmation Email asynchronously
+    const { sendOrderConfirmationEmail } = require("./utils/emailTemplates");
+    sendOrderConfirmationEmail(req.user, createdOrder).catch((err) => {
+      console.error("Failed to send order confirmation email:", err);
+    });
+
     res.status(201).json(createdOrder);
   } catch (error) {
     res.status(500).json({ message: "Failed to create order", error: error.message });
@@ -280,6 +286,12 @@ app.post("/api/orders/verify", protect, async (req, res) => {
       }
       throw saveError;
     }
+
+    // Send Order Confirmation Email asynchronously
+    const { sendOrderConfirmationEmail } = require("./utils/emailTemplates");
+    sendOrderConfirmationEmail(req.user, createdOrder).catch((err) => {
+      console.error("Failed to send order confirmation email:", err);
+    });
 
     res.status(201).json({ message: "Payment verified successfully", order: createdOrder });
   } catch (error) {
